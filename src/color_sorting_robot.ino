@@ -1,138 +1,211 @@
+/* Notes:
+    - Conveyor runs by default.
+    - When IR detects an object, conveyor is stopped, object is allowed to settle, color is read, pick-and-place executed, then conveyor restarts.
+*/
+
 #include <Servo.h>
-int val = 0 ;  
-Servo servo1;
-Servo servo2;
-Servo servo3;
 
-#define s0 4        
-#define s1 5
-#define s2 6
-#define s3 7
-#define out 8
+// Pin definitions
+const int IR_PIN     = 13;   // IR sensor digital output 
+const int RELAY_PIN  = 12;   // Relay pin for conveyor
 
-#define LED_R A0  
-#define LED_G A1
-#define LED_B A2
+// TCS3200 (GY-31) control pins
+const int S0 = 4;
+const int S1 = 5;
+const int S2 = 6;
+const int S3 = 7;
+const int OUT_PIN = 8;
 
-int Red=0, Blue=0, Green=0;
+// Indicator LED
+const int LED_R = A0;
+const int LED_G = A1;
+const int LED_B = A2;
 
-void setup() 
-{   
-// Attach servo motors to pins
+// Servos
+Servo servo1; // main arm
+Servo servo2; // base rotation
+Servo servo3; // gripper 
+
+const uint8_t CONVEYOR_RUN_STATE = HIGH; 
+const uint8_t CONVEYOR_STOP_STATE = (CONVEYOR_RUN_STATE == HIGH) ? LOW : HIGH;
+
+const uint16_t SETTLE_MS = 500;        // wait after stopping conveyor so object settles
+const uint16_t POST_PICK_DELAY = 500;  // small delay after actions
+const uint8_t  READS = 4;              // number of pulses to average per channel
+
+// Thresholds (tuned for lighting and sensor)
+const int RED_THRESHOLD   = 23;
+const int BLUE_THRESHOLD  = 20;
+const int GREEN_THRESHOLD = 20;
+
+// Storage for measured pulse durations 
+int Red = 0, Blue = 0, Green = 0;
+
+void setup() {
+  Serial.begin(9600);
+
+  // pins
+  pinMode(IR_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+
+  pinMode(LED_R, OUTPUT);
+  pinMode(LED_G, OUTPUT);
+  pinMode(LED_B, OUTPUT);
+
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(OUT_PIN, INPUT);
+
+  // Attach servos 
   servo1.attach(9);
   servo2.attach(10);
   servo3.attach(11);
-  
-  // Set initial positions for servo motors
-  servo1.write(90);
-  servo2.write(90);
-  servo3.write(90);
-  
-  pinMode(LED_R,OUTPUT);      
-  pinMode(LED_G,OUTPUT);
-  pinMode(LED_B,OUTPUT);
-  
-  pinMode(s0,OUTPUT);    
-  pinMode(s1,OUTPUT);
-  pinMode(s2,OUTPUT);
-  pinMode(s3,OUTPUT);
-  pinMode(out,INPUT);
-  
-  Serial.begin(9600);   
-  digitalWrite(s0,HIGH);  
-  digitalWrite(s1,HIGH);    
+
+  // Set initial servo positions
+  servo1.write(30);   // home and ready position
+  servo2.write(90);   // center bin position
+  servo3.write(90);   // gripper open
+
+  // TCS3200 frequency scaling 
+  // S0 S1 = HIGH HIGH -> 100% 
+  digitalWrite(S0, HIGH);
+  digitalWrite(S1, HIGH);
+
+  // Start conveyor 
+  digitalWrite(RELAY_PIN, CONVEYOR_RUN_STATE);
 }
 
-void loop()
-{ 
-  GetColors();
-  if   (Red<Blue && Red<Green && Red<=18){
-       Serial.println("Red");
-       digitalWrite(LED_R, HIGH);   
-    servo1.write(10);
-    delay(2000);
-    servo3.write(170);
-    delay(2000);
-    servo1.write(90);
-    delay(2000);
-    servo2.write(0);
-    delay(2000);
-    servo1.write(20);
-    delay(2000);
-    servo3.write(0);
-    delay(2000);
-    servo1.write(90);
-    delay(2000);
-    servo2.write(90);
-    delay(2000);
-  }  
-    
-  else{
-    digitalWrite(LED_R, LOW); 
-  }
-  
-  if   (Blue<Green && Blue<Red && Blue<20) {
-    Serial.println("Blue");
-    digitalWrite(LED_B, HIGH); 
-    servo1.write(10);
-    delay(2000);
-    servo3.write(170);
-    delay(2000);
-    servo1.write(90);
-    delay(2000);
-    servo2.write(179);
-    delay(2000);
-    servo1.write(20);
-    delay(2000);
-    servo3.write(0);
-    delay(2000);
-    servo1.write(90);
-    delay(2000);
-    servo2.write(90);
-    delay(2000);
-  }
-    
-   else{
-     digitalWrite(LED_B, LOW);
-   }
-  
-   if (Green<Red && Green<Blue && Green<= 8){
-    Serial.println("Green");
-    digitalWrite(LED_G, HIGH);
-    servo1.write(10);
-    delay(2000);
-    servo3.write(170);
-    delay(2000);
-    servo1.write(90);
-    delay(2000);
-    servo2.write(29);
-    delay(2000);
-    servo1.write(20);
-    delay(2000);
-    servo3.write(0);
-    delay (2000);
-    servo1.write(90);
-    delay(2000);
-    servo2.write(90);
-    delay(2000);
-   }
-     
-   else{
+void loop() {
+  // Read IR sensor 
+  int irVal = digitalRead(IR_PIN);
+
+  // If object is detected, stop the conveyor and process it
+  if (irVal == HIGH) { 
+    Serial.println("Object detected - stopping conveyor");
+    digitalWrite(RELAY_PIN, CONVEYOR_STOP_STATE); // stop conveyor
+    delay(50); // small debounce
+    // Wait for object to settle
+    delay(SETTLE_MS);
+
+    // Read and average color values
+    GetColoursAveraged();
+
+    Serial.print("Raw pulses - R: "); Serial.print(Red);
+    Serial.print("  G: "); Serial.print(Green);
+    Serial.print("  B: "); Serial.println(Blue);
+
+    // Decide color
+    if (Red < Blue && Red < Green && Red <= RED_THRESHOLD) {
+      Serial.println("Detected: RED");
+      indicateColor(LED_R);
+      pickAndPlaceForBin(0); 
+    }
+    else if (Blue < Red && Blue < Green && Blue <= BLUE_THRESHOLD) {
+      Serial.println("Detected: BLUE");
+      indicateColor(LED_B);
+      pickAndPlaceForBin(1);
+    }
+    else if (Green < Red && Green < Blue && Green <= GREEN_THRESHOLD) {
+      Serial.println("Detected: GREEN");
+      indicateColor(LED_G);
+      pickAndPlaceForBin(2);
+    }
+    else {
+      Serial.println("Color ambiguous!!! No pick!!!");
+    }
+
+    // Restart conveyor after handling
+    Serial.println("Restarting conveyor");
+    digitalWrite(RELAY_PIN, CONVEYOR_RUN_STATE);
+    delay(POST_PICK_DELAY);
+
+    // LEDs off
+    digitalWrite(LED_R, LOW);
     digitalWrite(LED_G, LOW);
-   }
-   delay(2000);
+    digitalWrite(LED_B, LOW);
+
+    // Small delay to avoid redetecting the same object immediately
+    delay(500);
+  }
+  // Else, no object detected, conveyor keeps running
+  else {
+    digitalWrite(RELAY_PIN, CONVEYOR_RUN_STATE);
+  }
+
+  // Loop small delay
+  delay(50);
 }
 
-void GetColors()  
-{    
-  digitalWrite(s2, LOW);                                           
-  digitalWrite(s3, LOW);                                           
-  Red = pulseIn(out, digitalRead(out) == HIGH ? LOW : HIGH);       
-  digitalWrite(s3, HIGH);                                         
-  Blue = pulseIn(out, digitalRead(out) == HIGH ? LOW : HIGH);
-  delay(20);  
-  digitalWrite(s2, HIGH);  
-  Green = pulseIn(out, digitalRead(out) == HIGH ? LOW : HIGH);
-  delay(20);  
+// Flash one LED and turn others off
+void indicateColor(int ledPin) {
+  digitalWrite(LED_R, LOW);
+  digitalWrite(LED_G, LOW);
+  digitalWrite(LED_B, LOW);
+  digitalWrite(ledPin, HIGH);
+}
+
+// binId: 0 = red bin, 1 = blue bin, 2 = green bin
+void pickAndPlaceForBin(int binId) {
+  // Servo angles for each bin 
+  const int BIN_ANGLE[] = {0, 150, 180}; // servo2 angles for bins 
+  const int PICK_ANGLE = 30;             // servo1 over pickup
+  const int TRAVEL_ANGLE = 90;           // servo1 travel or home
+  const int GRIP_CLOSE = 130;            // servo3 closed
+  const int GRIP_OPEN  = 0;              // servo3 open
+
+  // Move to pickup
+  servo1.write(PICK_ANGLE);
+  delay(800);
+  servo3.write(GRIP_CLOSE); // grab
+  delay(800);
+
+  // Lift slightly and move to travel
+  servo1.write(TRAVEL_ANGLE);
+  delay(800);
+
+  // Move selector to bin
+  servo2.write(BIN_ANGLE[binId]);
+  delay(800);
+
+  // Move to drop pose and release
+  servo1.write(30);    // lower into bin area 
+  delay(800);
+  servo3.write(GRIP_OPEN); // release
+  delay(800);
+
+  // Return to safe home positions
+  servo1.write(TRAVEL_ANGLE);
+  delay(600);
+  servo2.write(90); // center
+  delay(600);
+}
+
+// Read each channel multiple times and average to smooth noisy readings
+void GetColoursAveraged() {
+  long rSum = 0, gSum = 0, bSum = 0;
+  for (uint8_t i = 0; i < READS; ++i) {
+    // RED
+    digitalWrite(S2, LOW);
+    digitalWrite(S3, LOW);
+    rSum += pulseIn(OUT_PIN, digitalRead(OUT_PIN) == HIGH ? LOW : HIGH, 20000); 
+
+    // BLUE
+    digitalWrite(S2, LOW);
+    digitalWrite(S3, HIGH);
+    bSum += pulseIn(OUT_PIN, digitalRead(OUT_PIN) == HIGH ? LOW : HIGH, 20000);
+
+    // GREEN
+    digitalWrite(S2, HIGH);
+    digitalWrite(S3, HIGH);
+    gSum += pulseIn(OUT_PIN, digitalRead(OUT_PIN) == HIGH ? LOW : HIGH, 20000);
+
+    delay(20);
+  }
+
+  Red   = (int)(rSum / READS);
+  Blue  = (int)(bSum / READS);
+  Green = (int)(gSum / READS);
 }
 
