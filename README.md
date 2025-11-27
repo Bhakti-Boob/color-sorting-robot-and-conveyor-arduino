@@ -5,6 +5,8 @@ Pick‑and‑place robotic arm with a motorized conveyor that sorts small object
 This project implements an automated color‑based sorting system using a 2‑DOF acrylic robotic arm and a wooden conveyor belt. Objects move along the conveyor, are detected by an IR sensor, classified by a GY‑31 color sensor and then picked and placed by the arm into designated color bins.
 The prototype was developed as a Bachelor thesis project in Instrumentation and Control Engineering and later donated to the college laboratory as a demonstration model for industrial automation concepts.
 
+https://github.com/user-attachments/assets/f8708d25-fc2b-4d37-8708-a4a632f3dfb4
+
 # Features
 - Automated pick‑and‑place sorting of objects into bins based on detected RGB color.
 - Integrated conveyor stop/start using IR object detection to position items precisely under the color sensor.
@@ -22,7 +24,7 @@ The prototype was developed as a Bachelor thesis project in Instrumentation and 
    - Close gripper servo to grasp object.  
    - Rotate to the target color bin position.  
    - Open gripper to release and return to home.  
-5. Conveyor restarts and the cycle repeats.  
+5. Conveyor restarts and the cycle repeats.
 
 # Hardware and components used
 - Arduino Uno
@@ -39,6 +41,8 @@ The prototype was developed as a Bachelor thesis project in Instrumentation and 
 - Power and switching:  
   - 5 V / 5 A SMPS for electronics and servo supply
   - Relay module for switching the 12 V conveyor motor
+    
+<img width="2815" height="1560" alt="Block_Diagram" src="https://github.com/user-attachments/assets/2271d7bd-573f-447a-a5ab-c9836e60118b" />
 
 # Applications and Limitations
 Application domains include:
@@ -52,5 +56,5 @@ Known limitations:
 
 # How to Use This Repository
 - `/src/` – Arduino sketch for the robotic arm, conveyor, color sensor and IR sensor integration  
-- `/hardware/` – Schematics, wiring diagrams and mechanical drawings
+- `/circuit_diagrams/` – Schematics, wiring diagrams
 - `/docs/` – Detailed project report, photos and videos of the assembled prototype
