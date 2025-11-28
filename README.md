@@ -5,7 +5,10 @@ Pick‑and‑place robotic arm with a motorized conveyor that sorts small object
 This project implements an automated color‑based sorting system using a 2‑DOF acrylic robotic arm and a wooden conveyor belt. Objects move along the conveyor, are detected by an IR sensor, classified by a GY‑31 color sensor and then picked and placed by the arm into designated color bins.
 The prototype was developed as a Bachelor thesis project in Instrumentation and Control Engineering and later donated to the college laboratory as a demonstration model for industrial automation concepts.
 
-https://github.com/user-attachments/assets/f8708d25-fc2b-4d37-8708-a4a632f3dfb4
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/f8708d25-fc2b-4d37-8708-a4a632f3dfb4" width="400" controls></video>
+</div>
+
 
 # Features
 - Automated pick‑and‑place sorting of objects into bins based on detected RGB color.
@@ -41,8 +44,11 @@ https://github.com/user-attachments/assets/f8708d25-fc2b-4d37-8708-a4a632f3dfb4
 - Power and switching:  
   - 5 V / 5 A SMPS for electronics and servo supply
   - Relay module for switching the 12 V conveyor motor
-    
-<img width="2815" height="1560" alt="Block_Diagram" src="https://github.com/user-attachments/assets/2271d7bd-573f-447a-a5ab-c9836e60118b" />
+
+<div align="center">
+  <img width="600" height="300" alt="Block_Diagram" src="https://github.com/user-attachments/assets/2271d7bd-573f-447a-a5ab-c9836e60118b" />
+</div>
+
 
 # Applications and Limitations
 Application domains include:
